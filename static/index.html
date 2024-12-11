@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/styles.css">
+    <title>User Management</title>
+</head>
+<body>
+    <header>
+        <h1>User Management System</h1>
+    </header>
+    <main>
+        <div id="notification" class="notification hidden"></div>
+
+        <section>
+            <h2>Login</h2>
+            <form id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Username" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Register</h2>
+            <form id="registerForm">
+                <input type="text" id="registerUsername" placeholder="Username" required>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="text" id="registerFullName" placeholder="Full Name">
+                <input type="password" id="registerPassword" placeholder="Password" required>
+                <button type="submit">Register</button>
+            </form>
+        </section>
+
+        <section>
+            <h2>Get Users</h2>
+            <button id="getUsersButton">Get Users</button>
+            <div id="userList"></div>
+        </section>
+
+        <section>
+            <h2>Delete User</h2>
+            <input type="number" id="deleteUserId" placeholder="User ID" required>
+            <button id="deleteUserButton">Delete User</button>
+        </section>
+
+        <section>
+            <h2>Update User</h2>
+            <input type="number" id="updateUserId" placeholder="User ID" required>
+            <input type="text" id="updateUsername" placeholder="New Username">
+            <input type="email" id="updateEmail" placeholder="New Email">
+            <input type="text" id="updateFullName" placeholder="New Full Name">
+            <input type="password" id="updatePassword" placeholder="New Password">
+            <button id="updateUserButton">Update User</button>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2024 User Management System. All rights reserved.</p>
+    </footer>
+
+    <script>
+        const notification = document.getElementById('notification');
+
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.classList.remove('hidden');
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 3000);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const response = await fetch('/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ username, password }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Сохраняем токен в localStorage
+                localStorage.setItem('token', data.access_token);
+                showNotification('Login successful! Token saved.');
+            } else {
+                showNotification('Login failed! Please check your credentials.');
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const fullName = document.getElementById('registerFullName').value;
+            const password = document.getElementById('registerPassword').value;
+
+            const response = await fetch('/register/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, email, full_name: fullName, password }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showNotification('User registered successfully! ID: ' + data.id);
+            } else {
+                // Чтение ошибки с сервера
+                const error = await response.json();
+                showNotification('Registration failed! ' + error.detail);
+            }
+        });
+
+        document.getElementById('getUsersButton').addEventListener('click', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showNotification('Please log in first.');
+                return;
+            }
+
+            const response = await fetch('/users/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                },
+            });
+
+            if (response.ok) {
+                const users = await response.json();
+                const userList = document.getElementById('userList');
+                userList.innerHTML = '<h3>User List:</h3><ul>' + users.map(user =>
+                    `<li>ID: ${user.id}, Username: ${user.username} (${user.email})</li>`).join('') + '</ul>';
+            } else {
+                showNotification('Failed to fetch users. Please log in first.');
+            }
+        });
+
+        document.getElementById('deleteUserButton').addEventListener('click', async () => {
+            const userId = document.getElementById('deleteUserId').value;
+
+            if (!userId) {
+                showNotification('Please enter a valid user ID.');
+                return;
+            }
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showNotification('Please log in first.');
+                return;
+            }
+
+            const response = await fetch(`/users/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                },
+            });
+
+            if (response.ok) {
+                showNotification('User deleted successfully!');
+            } else {
+                const error = await response.json();
+                showNotification(`Failed to delete user: ${error.detail}`);
+            }
+        });
+
+            document.getElementById('updateUserButton').addEventListener('click', async () => {
+            const userId = document.getElementById('updateUserId').value;
+            const username = document.getElementById('updateUsername').value;
+            const email = document.getElementById('updateEmail').value;
+            const fullName = document.getElementById('updateFullName').value;
+            const password = document.getElementById('updatePassword').value;
+
+            // Проверьте, что ID пользователя введен
+            if (!userId) {
+                showNotification('Please enter a valid user ID.');
+                return;
+            }
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showNotification('Please log in first.');
+                return;
+            }
+
+            // Создайте объект с обновленными данными
+            const updatedUser = {
+                username: username || undefined, // Если не введено, не отправлять это поле
+                email: email || undefined,
+                full_name: fullName || undefined,
+                password: password || undefined,
+            };
+
+            const response = await fetch(`/users/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatedUser),
+            });
+
+            if (response.ok) {
+                showNotification('User updated successfully!');
+            } else {
+                const error = await response.json();
+                showNotification('Failed to update user: ' + error.detail);
+            }
+        });
+    </script>
+</body>
+</html>
